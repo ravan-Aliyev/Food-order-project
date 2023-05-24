@@ -1,14 +1,18 @@
 import Modal from "../UI/Modal";
 import styles from "./Cart.module.css";
 import CartContext from "../../store/cart-context";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import CartItem from "./CartItem";
+import Checkout from "./Checkout";
 
 const Cart = function (props) {
+  const [openForm, setOpenForm] = useState(false);
+  const [isSubmiting, setIsSubmit] = useState(false);
+  const [didSubmit, setDidSubmit] = useState(false);
   const ctx = useContext(CartContext);
 
-  const totalAmount = `$${ctx.totalAmount.toFixed(2)}`;
-  const hasItems = ctx.items.length > 0;
+  const totalAmount = `$${ctx.totalAmount?.toFixed(2)}`;
+  const hasItems = ctx.items?.length > 0;
 
   const cartItemRemoveHandler = (id) => {
     ctx.removeItem(id);
@@ -18,9 +22,30 @@ const Cart = function (props) {
     ctx.addItem({ ...item, amount: 1 });
   };
 
+  const checkoutHandler = () => {
+    setOpenForm(true);
+  };
+
+  const submitOrderHandler = async (userData) => {
+    setIsSubmit(true);
+    await fetch(
+      "https://costom-hooks-learning-default-rtdb.firebaseio.com/orders.json",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          user: userData,
+          orderedItems: ctx.items,
+        }),
+      }
+    );
+    setIsSubmit(false);
+    setDidSubmit(true);
+    ctx.clearCart();
+  };
+
   const cartItems = (
     <ul className={styles["cart-items"]}>
-      {ctx.items.map((item) => (
+      {ctx.items?.map((item) => (
         <CartItem
           key={item.id}
           name={item.name}
@@ -32,19 +57,41 @@ const Cart = function (props) {
       ))}
     </ul>
   );
-  return (
-    <Modal onClose={props.onClose}>
+
+  const modalActions = (
+    <div className={styles.actions}>
+      <button className={styles["button--alt"]} onClick={props.onClose}>
+        Close
+      </button>
+      {hasItems && (
+        <button className={styles.button} onClick={checkoutHandler}>
+          Order
+        </button>
+      )}
+    </div>
+  );
+
+  const cartModal = (
+    <>
       {cartItems}
       <div className={styles.total}>
         <span>Total Amount</span>
         <span>{totalAmount}</span>
       </div>
-      <div className={styles.actions}>
-        <button className={styles["button--alt"]} onClick={props.onClose}>
-          Close
-        </button>
-        {hasItems && <button className={styles.button}>Order</button>}
-      </div>
+      {openForm && (
+        <Checkout onCancel={props.onClose} onConfirm={submitOrderHandler} />
+      )}
+      {!openForm && modalActions}
+    </>
+  );
+
+  const isSubmitingModalContent = <p>Sending order data..</p>;
+
+  return (
+    <Modal onClose={props.onClose}>
+      {!isSubmiting && !didSubmit && cartModal}
+      {isSubmiting && isSubmitingModalContent}
+      {!isSubmiting && didSubmit && <p>Order confirmed</p>}
     </Modal>
   );
 };
